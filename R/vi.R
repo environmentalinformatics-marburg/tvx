@@ -24,16 +24,17 @@ lst <- lapply(c("MOD09Q1", "MYD09Q1"), function(product) {
   cat("Commencing with the processing of", product, "...\n")
   
   # ## download data
-  # runGdal(product = product, begin = "2013001", end = "2015365",
+  # runGdal(product = product, begin = "2011001", 
   #         tileH = 21, tileV = 9, job = paste0(product, ".006"), wait = 15,
   #         collection = getCollection(product, forceCheck = TRUE)
   #         )
   
+  
   ### crop layers ----------------------------------------------------------------
   
-  # ## reference extent
-  # ext_crop <- raster("data/reference_grid.tif")
-  # 
+  ## reference extent
+  ext_crop <- raster("data/reference_grid.tif")
+
   # ## perform crop
   # rst_crp <- foreach(i = c("b01", "b02", "state_250m", "qc_250m"),
   #                    .packages = "MODIS") %dopar% {
@@ -41,6 +42,7 @@ lst <- lapply(c("MOD09Q1", "MYD09Q1"), function(product) {
   #   # list and import available files
   #   fls <- list.files(paste0(getOption("MODIS_outDirPath"), "/", product, ".006"),
   #                     pattern = paste0(i, ".tif$"), full.names = TRUE)
+  #   
   #   rst <- raster::stack(fls)
   # 
   #   # crop
@@ -69,15 +71,15 @@ lst <- lapply(c("MOD09Q1", "MYD09Q1"), function(product) {
   #   raster::stack(lst_out)
   # }
   
-  # ## reimport cropped files
-  # rst_crp <- foreach(i = c("b01", "b02", "state_250m", "qc_250m")) %do% {
-  #   
-  #   # list and import available files
-  #   dir_crp <- paste0("data/", product, ".006/crp")
-  #   fls_crp <- list.files(dir_crp, pattern = paste0(i, ".tif$"), full.names = TRUE)
-  #   
-  #   raster::stack(fls_crp)
-  # }
+  ## reimport cropped files
+  rst_crp <- foreach(i = c("b01", "b02", "state_250m", "qc_250m")) %do% {
+
+    # list and import available files
+    dir_crp <- paste0("data/", product, ".006/crp")
+    fls_crp <- list.files(dir_crp, pattern = paste0(i, ".tif$"), full.names = TRUE)
+
+    raster::stack(fls_crp)
+  }
   
   
   ### quality control, step #1: ------------------------------------------------

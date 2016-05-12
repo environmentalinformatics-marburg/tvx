@@ -21,11 +21,13 @@ MODISoptions(localArcPath = "data/MODIS_ARC",
 
 # ## download data
 # foreach(product = c("MOD11A2", "MYD11A2"), .packages = lib) %dopar%
-#   MODIS::getHdf(product, tileH = 21, tileV = 9, collection = "005")
+#   MODIS::getHdf(product, tileH = 21, tileV = 9, collection = "005", 
+#                 begin = "2011001")
 # 
 # ## extract relevant sds
 # foreach(product = c("MOD11A2", "MYD11A2")) %do%
 #   MODIS::runGdal(product, tileH = 21, tileV = 9, collection = "005", 
+#                  begin = "2011001",
 #                  SDSstring = "110011000011", job = paste0(product, ".005"))
 
 
@@ -54,6 +56,7 @@ lst <- lapply(c("MOD11A2", "MYD11A2"), function(product) {
   #   # list and import available files
   #   fls <- list.files(paste0(getOption("MODIS_outDirPath"), "/", product, ".005"),
   #                     pattern = paste0(i, ".tif$"), full.names = TRUE)
+  #   
   #   rst <- raster::stack(fls)
   # 
   #   # crop
