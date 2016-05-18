@@ -11,6 +11,7 @@ Orcs::loadPkgs(lib)
 ## load functions
 source("R/movingModel.R")
 source("R/funs.R")
+source("R/visKili.R")
 
 
 ### lst -----
@@ -135,55 +136,16 @@ arrow <- list("SpatialPolygonsRescale", layout.north.arrow(type = 1),
 p_kili <- spplot(rst_robust, col.regions = "transparent", 
                  scales = list(draw = TRUE, cex = .6), colorkey = FALSE, 
                  sp.layout = list(rgb2spLayout(rst_kili, c(.01, .998)), 
-                                  scale, text1, text2))
+                                  scale, text1, text2, 
+                                  list("sp.text", loc = c(37.02, -2.86), 
+                                       txt = "a)", font = 2, cex = .6, 
+                                       adj = c(.1, 1), col = "black")))
 
-## in-text .png version
-png("vis/figure01.png", width = 19, height = 9, units = "cm", res = 500)
-plot.new()
-
-# add image of study area
-vp0 <- viewport(-.025, 0, .55, 1, just = c("left", "bottom"))
-pushViewport(vp0)
-print(p_kili, newpage = FALSE)
-
-# add raster with r values
-upViewport()
-vp1 <- viewport(.425, 0, .55, 1, just = c("left", "bottom"))
-pushViewport(vp1)
-print(spplot(rst_robust, 
-             at = seq(-.85, .85, .01), col.regions = clr, colorkey = FALSE, 
-             scales = list(draw = TRUE, cex = .6, y = list(col = "transparent")), 
-             par.settings = list(panel.background=list(col="grey80"))), 
-      newpage = FALSE)
-
-# add colorkey
-downViewport(trellis.vpname("figure"))
-
-vp2 <- viewport(1.075, 0, .1, 1, just = c("left", "bottom"))
-pushViewport(vp2)
-draw.colorkey(key = list(labels = list(cex = .6), col = clr, 
-                         at = seq(-.85, .85, .01), width = .6, height = .75, 
-                         space = "right"), draw = TRUE)
-
-grid.text("r", 0, .95, gp = gpar(fontface = "bold", cex = .7))
-
-# add hatches
-upViewport()
-par(new = TRUE, fig = gridFIG(), mai = c(0, 0, 0, 0))
-plot(spy_r_sig, border = "transparent", bg = "transparent", density = 10, 
-     col = "grey50", xlim = c(xmin(rst_r_sig), xmax(rst_r_sig)), xaxs = "i", 
-     yaxs = "i", ylim = c(ymin(rst_r_sig), ymax(rst_r_sig)))
-
-# add contour lines
-par(new = TRUE, fig = gridFIG(), mai = c(0, 0, 0, 0))
-plot(spy_r_dis, border = "grey30", bg = "transparent", lwd = 1.2,
-     xlim = c(xmin(rst_r_sig), xmax(rst_r_sig)), xaxs = "i", 
-     yaxs = "i", ylim = c(ymin(rst_r_sig), ymax(rst_r_sig)))
-
-dev.off()
+## topographic map
+p_topo <- visKili(cex = .6, lwd = .1, ext = rst_kili)
 
 ## standalone .tif version
-tiff("vis/figure01.tiff", width = 19, height = 9, units = "cm", res = 500, 
+tiff("vis/figure01.tiff", width = 19, height = 9, units = "cm", res = 300, 
      compression = "lzw")
 plot.new()
 
@@ -192,14 +154,24 @@ vp0 <- viewport(-.025, 0, .55, 1, just = c("left", "bottom"))
 pushViewport(vp0)
 print(p_kili, newpage = FALSE)
 
+# add topographic map
+downViewport(trellis.vpname("figure"))
+vp_topo <- viewport(x = .65, y = .6, just = c("left", "bottom"), 
+                    width = .425, height = .475)
+pushViewport(vp_topo)
+print(p_topo, newpage = FALSE)
+
 # add raster with r values
-upViewport()
+upViewport(0)
 vp1 <- viewport(.425, 0, .55, 1, just = c("left", "bottom"))
 pushViewport(vp1)
 print(spplot(rst_robust, 
              at = seq(-.85, .85, .01), col.regions = clr, colorkey = FALSE, 
              scales = list(draw = TRUE, cex = .6, y = list(col = "transparent")), 
-             par.settings = list(panel.background=list(col="grey80"))), 
+             par.settings = list(panel.background=list(col="grey80")), 
+             sp.layout = list("sp.text", loc = c(37.02, -2.86), 
+                              txt = "b)", font = 2, cex = .6, 
+                              adj = c(.1, 1), col = "black")), 
       newpage = FALSE)
 
 # add colorkey
@@ -225,5 +197,8 @@ par(new = TRUE, fig = gridFIG(), mai = c(0, 0, 0, 0))
 plot(spy_r_dis, border = "grey30", bg = "transparent", lwd = 1.2,
      xlim = c(xmin(rst_r_sig), xmax(rst_r_sig)), xaxs = "i", 
      yaxs = "i", ylim = c(ymin(rst_r_sig), ymax(rst_r_sig)))
+
+# add black margin
+grid.rect(gp = gpar(fill = "transparent"))
 
 dev.off()
