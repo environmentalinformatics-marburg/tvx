@@ -54,6 +54,28 @@ mat_ndvi_res <- raster::as.matrix(rst_ndvi_res)
 
 rst_kili <- stack("data/kili_ll.tif")
 
+## plots
+shp_plots <- readOGR("data/station_data", p4s = "+init=epsg:21037",
+                     layer = "PlotPoles_ARC1960_mod_20140807_final")
+
+shp_plots <- subset(shp_plots, PoleType == "AMP")
+
+dat_select <- readRDS("data/results/ndvimax_rmse_7by7_terra.rds")
+
+dat_select$habitat <- substr(dat_select$PlotID, 1, 3)
+dat_select$habitat[dat_select$PlotID == "mch0"] <- "fpo"
+dat_select$habitat[dat_select$PlotID == "mwh0"] <- "fpd"
+
+dat_select %>%
+  filter(n >= 10) %>%
+  mutate(ratio = rmse / n * (-1)) %>%
+  group_by(habitat) %>%
+  top_n(n = 2, wt = ratio) %>%
+  data.frame() -> dat_sel
+
+shp_plots <- shp_plots[shp_plots$PlotID %in% dat_sel$PlotID, ]
+shp_plots <- spTransform(shp_plots, CRS = CRS("+init=epsg:4326"))
+
 
 ### correlation -----
 
@@ -134,23 +156,34 @@ arrow <- list("SpatialPolygonsRescale", layout.north.arrow(type = 1),
               offset = c(37, -3.41), scale = .075)
 
 p_kili <- spplot(rst_robust, col.regions = "transparent", 
-                 scales = list(draw = TRUE, cex = .6), colorkey = FALSE, 
+                 scales = list(draw = TRUE, cex = .6, 
+                               y = list(rot = 90)), colorkey = FALSE, 
                  sp.layout = list(rgb2spLayout(rst_kili, c(.01, .998)), 
                                   scale, text1, text2, 
                                   list("sp.text", loc = c(37.02, -2.86), 
                                        txt = "a)", font = 2, cex = .6, 
                                        adj = c(.1, 1), col = "black")))
 
+clr_pts <- viridisLite::plasma(13)
+names(clr_pts) <- sortElevation(df = FALSE)
+
+shp_plots$habitat <- factor(shp_plots$habitat, levels = sortElevation(FALSE))
+p_pts <- spplot(shp_plots, "habitat", col.regions = clr_pts, pch = 21) + 
+  latticeExtra::layer(sp.points(shp_plots, pch = 21, cex = 1.1, col = "black"))
+
+p_kili <- p_kili + 
+  latticeExtra::as.layer(p_pts)
+
 ## topographic map
 p_topo <- visKili(cex = .6, lwd = .1, ext = rst_kili)
 
-## standalone .tif version
+## standalone .tiff version
 tiff("vis/figure01.tiff", width = 19, height = 9, units = "cm", res = 300, 
      compression = "lzw")
 plot.new()
 
 # add image of study area
-vp0 <- viewport(-.025, 0, .55, 1, just = c("left", "bottom"))
+vp0 <- viewport(-.025, -.075, .55, 1, just = c("left", "bottom"))
 pushViewport(vp0)
 print(p_kili, newpage = FALSE)
 
@@ -161,13 +194,27 @@ vp_topo <- viewport(x = .65, y = .6, just = c("left", "bottom"),
 pushViewport(vp_topo)
 print(p_topo, newpage = FALSE)
 
+# add points legend
+upViewport()
+vp_key <- viewport(x = 0, y = 1.075, width = 1, height = .1, 
+                   just = c("left", "bottom"))
+pushViewport(vp_key)
+draw.key(key = list(points = list(pch = 21, col = "black", 
+                                  fill = rev(clr_pts)[c(1, 8, 2, 9, 3, 10, 4, 11, 5, 12, 6, 13, 7)]), 
+                    text = list(c("mai", "fod", "sav", "fpo", "cof", "fpd", "hom", "fer", "gra", "fed", "flm", 
+                                  "hel", "foc"), cex = .6), columns = 7, between = .6, 
+                    between.columns = 1), draw = TRUE)
+
+grid.text("Habitat type", .5, 1.6, gp = gpar(fontface = "bold", cex = .7))
+
 # add raster with r values
 upViewport(0)
-vp1 <- viewport(.425, 0, .55, 1, just = c("left", "bottom"))
+vp1 <- viewport(.435, -.075, .55, 1, just = c("left", "bottom"))
 pushViewport(vp1)
 print(spplot(rst_robust, 
              at = seq(-.85, .85, .01), col.regions = clr, colorkey = FALSE, 
-             scales = list(draw = TRUE, cex = .6, y = list(col = "transparent")), 
+             scales = list(draw = TRUE, cex = .6, 
+                           y = list(col = "transparent", rot = 90)), 
              par.settings = list(panel.background=list(col="grey80")), 
              sp.layout = list("sp.text", loc = c(37.02, -2.86), 
                               txt = "b)", font = 2, cex = .6, 
@@ -177,13 +224,13 @@ print(spplot(rst_robust,
 # add colorkey
 downViewport(trellis.vpname("figure"))
 
-vp2 <- viewport(1.075, 0, .1, 1, just = c("left", "bottom"))
+vp2 <- viewport(0, 1.075, 1, .1, just = c("left", "bottom"))
 pushViewport(vp2)
 draw.colorkey(key = list(labels = list(cex = .6), col = clr, 
                          at = seq(-.85, .85, .01), width = .6, height = .75, 
-                         space = "right"), draw = TRUE)
+                         space = "top"), draw = TRUE)
 
-grid.text("r", 0, .95, gp = gpar(fontface = "bold", cex = .7))
+grid.text("Pearson's r", .5, 1.6, gp = gpar(fontface = "bold", cex = .7))
 
 # add hatches
 upViewport()
