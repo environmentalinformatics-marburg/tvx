@@ -5,7 +5,7 @@ rm(list = ls(all = TRUE))
 
 ## load packages
 lib <- c("foreach", "MODIS", "Rsenal", "latticeExtra", "reshape2", "grid", 
-         "gridBase", "mapview")
+         "gridBase", "mapview", "dplyr")
 Orcs::loadPkgs(lib)
 
 ## load functions

@@ -15,9 +15,7 @@ dat_training <- readRDS("data/results/stats_intra_7by7_terra.rds")
 
 ## reorder factor levels
 dat_training$habitat <- factor(dat_training$habitat, 
-                               levels = c("mai", "sav", "cof", "hom", "gra", 
-                                          "flm", "fod", "foc", "fpo", "fpd", 
-                                          "fer", "fed", "hel"))
+                               levels = rev(sortElevation(df = FALSE)))
 
 ## melt data
 prm1 <- c("habitat", "TrainRsq", "TrainRMSE", "TrainRMSEse", 
@@ -72,9 +70,7 @@ prediction_stats <- readRDS("data/results/stats_inter_7by7_terra.rds")
 
 ## reorder factor levels
 prediction_stats$habitat <- factor(prediction_stats$habitat, 
-                                   levels = c("mai", "sav", "cof", "hom", "gra", 
-                                              "flm", "fod", "foc", "fpo", "fpd", 
-                                              "fer", "fed", "hel"))
+                                   levels = rev(sortElevation(df = FALSE)))
 
 ## melt data
 prm2 <- c("habitat", "rsq", "rmse", "rmse.se")
