@@ -32,11 +32,24 @@ if (!dir.exists(dir_out)) dir.create(dir_out)
 fls <- list.files(paste0(getOption("MODIS_outDirPath"), "/MCD12Q1.051"),
                   pattern = ".tif$", full.names = TRUE)
 
-rst <- raster::stack(fls)
+rst <- stack(fls)
 
 ## crop
 dir_crp <- paste0(dir_out, "/crp")
 if (!dir.exists(dir_crp)) dir.create(dir_crp)
 
 fls_crp <- paste(dir_crp, basename(fls), sep = "/")
-rst_crp <- raster::crop(rst, rst_ref, snap = "out")
+rst_crp <- crop(rst, rst_ref, snap = "out")
+
+## chala
+spy_chala <- readOGR("data/station_data", "Lake_Chala")
+spy_chala <- spTransform(spy_chala, CRS = CRS("+init=epsg:21037"))
+
+id <- unlist(cellFromPolygon(rst_crp, spy_chala))
+rst_crp[id] <- 0
+
+lapply(1:nlayers(rst_crp), function(i) {
+  rst_crp <- writeRaster(rst_crp[[i]], 
+                         paste0("data/MCD12Q1.051/", names(rst_crp)[i]), 
+                         format = "GTiff", overwrite = TRUE)
+})
