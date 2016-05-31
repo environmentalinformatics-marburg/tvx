@@ -9,6 +9,10 @@ movingWindow <- function(width = 7L, height = width) {
 #' Sort Habitats by Elevation
 #' 
 sortElevation <- function(df = TRUE) {
+  
+  ## load required packages
+  library(dplyr)
+  
   ## import plot data
   shp_plots <- readOGR("data/station_data", p4s = "+init=epsg:21037",
                        layer = "PlotPoles_ARC1960_mod_20140807_final")

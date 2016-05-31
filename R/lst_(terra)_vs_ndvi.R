@@ -95,6 +95,16 @@ plots <- readOGR(dsn = "data/station_data",
 
 plots <- subset(plots, PoleType == "AMP")
 
+# ## remove plots in immediate vicinity to water (chala) or settlements (moshi)
+# rst_lc <- raster("data/MCD12Q1.051/MCD12Q1.A2013001.Land_Cover_Type_5.tif")
+# 
+# id <- extract(rst_lc, plots, cellnumbers = TRUE)[, 1]
+# 
+# invalid <- foreach(i = id, .combine = "c", .packages = "raster") %dopar% {
+#   cells <- adjacent(rst_lc, i, directions = movingWindow(15L), pairs = FALSE)
+#   any(rst_lc[cells] %in% c(0, 9))
+# }
+
 ## import available plot data 
 fls_plots <- list.files("data/station_data/plots", pattern = ".csv", 
                         full.names = TRUE)  
@@ -110,96 +120,96 @@ dat_plots$habitat[dat_plots$plotID == "mwh0"] <- "fpd"
 
 ### select training plots -----
 
-## loop over plots
-dat_select <- foreach(h = as.character(unique(dat_plots$plotID)),
-               .packages = lib, .combine = "rbind") %dopar% {
-
-  ## extract daily maximum temperature
-  dat_plots %>%
-    filter(plotID == h & !is.na(Ta_200)) %>%
-    group_by(Date = as.Date(datetime)) %>%
-    filter(length(Ta_200) == 24) %>%
-    summarise(Ta_200 = max(Ta_200, na.rm = TRUE)) %>%
-    data.frame() -> dat_sub
-
-  ## synchronise with modis time steps, i.e. aggregate 8-day mean maximum values
-  dat_agg <- foreach(i = unique(lubridate::year(dat_sub$Date)),
-                     .combine = "rbind") %do% {
-
-    # merge available dates with continuous daily time series
-    dts0 <- seq(as.Date(paste0(i, "-01-01")), as.Date(paste0(i, "-12-31")), 1)
-    mrg <- merge(data.frame(Date = dts0), dat_sub, all.x = TRUE)
-
-    # aggregate 8-day intervals
-    mrg$Cuts <- cut(mrg$Date, "8 days")
-    mrg <- mrg[complete.cases(mrg), ]
-
-    mrg %>%
-      group_by(Cuts) %>%
-      summarise(Ta_200 = round(mean(Ta_200, na.rm = TRUE), 2)) %>%
-      data.frame()
-  }
-
-  ## extract intercept and slope values
-  dts_lst <- MODIS::extractDate(names(rst_lst))$inputLayerDates
-  avl <- dts_lst %in% strftime(dat_agg$Cuts, "%Y%j")
-
-  if (all(!avl) | sum(avl) == 1) {
-    return(data.frame(PlotID = h, NDVImax = NA, rsq = NA, rmse = NA, bias = NA,
-                      n = ifelse(sum(avl) == 1, 1, NA)))
-  }
-
-  metrics <- foreach(i = list(mat_intercept, mat_slope),
-                     j = list(rst_intercept, rst_slope)) %do% {
-
-    mat <- i[, avl]
-    rst <- j[[which(avl)]]
-
-    cell_id <- cellFromXY(j, plots[plots@data$PlotID == h, ])
-    val <- mat[cell_id, ]
-
-    if (all(is.na(val))) {
-      data.frame(Date = MODIS::extractDate(names(rst))$inputLayerDates,
-                 rep(NA, length(MODIS::extractDate(names(rst))$inputLayerDates)))
-    } else {
-      data.frame(Date = MODIS::extractDate(names(rst))$inputLayerDates, val)
-    }
-  }
-
-  metrics <- Reduce(function(...) merge(..., by = "Date", all = TRUE), metrics)
-  names(metrics)[2:3] <- c("Intercept", "Slope")
-
-  if (all(is.na(metrics$Intercept)) | all(is.na(metrics$Slope))) {
-    return(data.frame(PlotID = h, NDVImax = NA, rsq = NA, rmse = NA, bias = NA, n = NA))
-  }
-
-  ## loop over sequence of ndvi_max values
-  dat_agg$Date <- strftime(dat_agg$Cuts, "%Y%j")
-  dat_mrg <- merge(dat_agg, metrics, all.y = TRUE)
-
-  n <- sum(complete.cases(dat_mrg))
-
-  ta_obs <- dat_mrg$Ta_200
-
-  stats <- foreach(i = seq(.2, 1, .01), .combine = "rbind") %do% {
-
-    # estimate temperature
-    ta_prd <- (dat_mrg$Slope * i + dat_mrg$Intercept)
-
-    # calculate r-squared, rmse, and bias
-    data.frame(PlotID = h, NDVImax = i,
-               rsq = summary(lm(ta_prd ~ ta_obs))$r.squared,
-               rmse = rmse(ta_obs, ta_prd),
-               bias = pbias(ta_prd, ta_obs), n = n)
-  }
-
-  # parallel::stopCluster(cl2)
-  stats[which.min(stats$rmse), ]
-}
-
-dat_select <- dat_select[complete.cases(dat_select), ]
-
-saveRDS(dat_select, file = "data/results/ndvimax_rmse_7by7_terra.rds")
+# ## loop over plots
+# dat_select <- foreach(h = as.character(unique(dat_plots$plotID)),
+#                .packages = lib, .combine = "rbind") %dopar% {
+# 
+#   ## extract daily maximum temperature
+#   dat_plots %>%
+#     filter(plotID == h & !is.na(Ta_200)) %>%
+#     group_by(Date = as.Date(datetime)) %>%
+#     filter(length(Ta_200) == 24) %>%
+#     summarise(Ta_200 = max(Ta_200, na.rm = TRUE)) %>%
+#     data.frame() -> dat_sub
+# 
+#   ## synchronise with modis time steps, i.e. aggregate 8-day mean maximum values
+#   dat_agg <- foreach(i = unique(lubridate::year(dat_sub$Date)),
+#                      .combine = "rbind") %do% {
+# 
+#     # merge available dates with continuous daily time series
+#     dts0 <- seq(as.Date(paste0(i, "-01-01")), as.Date(paste0(i, "-12-31")), 1)
+#     mrg <- merge(data.frame(Date = dts0), dat_sub, all.x = TRUE)
+# 
+#     # aggregate 8-day intervals
+#     mrg$Cuts <- cut(mrg$Date, "8 days")
+#     mrg <- mrg[complete.cases(mrg), ]
+# 
+#     mrg %>%
+#       group_by(Cuts) %>%
+#       summarise(Ta_200 = round(mean(Ta_200, na.rm = TRUE), 2)) %>%
+#       data.frame()
+#   }
+# 
+#   ## extract intercept and slope values
+#   dts_lst <- MODIS::extractDate(names(rst_lst))$inputLayerDates
+#   avl <- dts_lst %in% strftime(dat_agg$Cuts, "%Y%j")
+# 
+#   if (all(!avl) | sum(avl) == 1) {
+#     return(data.frame(PlotID = h, NDVImax = NA, rsq = NA, rmse = NA, bias = NA,
+#                       n = ifelse(sum(avl) == 1, 1, NA)))
+#   }
+# 
+#   metrics <- foreach(i = list(mat_intercept, mat_slope),
+#                      j = list(rst_intercept, rst_slope)) %do% {
+# 
+#     mat <- i[, avl]
+#     rst <- j[[which(avl)]]
+# 
+#     cell_id <- cellFromXY(j, plots[plots@data$PlotID == h, ])
+#     val <- mat[cell_id, ]
+# 
+#     if (all(is.na(val))) {
+#       data.frame(Date = MODIS::extractDate(names(rst))$inputLayerDates,
+#                  rep(NA, length(MODIS::extractDate(names(rst))$inputLayerDates)))
+#     } else {
+#       data.frame(Date = MODIS::extractDate(names(rst))$inputLayerDates, val)
+#     }
+#   }
+# 
+#   metrics <- Reduce(function(...) merge(..., by = "Date", all = TRUE), metrics)
+#   names(metrics)[2:3] <- c("Intercept", "Slope")
+# 
+#   if (all(is.na(metrics$Intercept)) | all(is.na(metrics$Slope))) {
+#     return(data.frame(PlotID = h, NDVImax = NA, rsq = NA, rmse = NA, bias = NA, n = NA))
+#   }
+# 
+#   ## loop over sequence of ndvi_max values
+#   dat_agg$Date <- strftime(dat_agg$Cuts, "%Y%j")
+#   dat_mrg <- merge(dat_agg, metrics, all.y = TRUE)
+# 
+#   n <- sum(complete.cases(dat_mrg))
+# 
+#   ta_obs <- dat_mrg$Ta_200
+# 
+#   stats <- foreach(i = seq(.2, 1, .01), .combine = "rbind") %do% {
+# 
+#     # estimate temperature
+#     ta_prd <- (dat_mrg$Slope * i + dat_mrg$Intercept)
+# 
+#     # calculate r-squared, rmse, and bias
+#     data.frame(PlotID = h, NDVImax = i,
+#                rsq = summary(lm(ta_prd ~ ta_obs))$r.squared,
+#                rmse = rmse(ta_obs, ta_prd),
+#                bias = pbias(ta_prd, ta_obs), n = n)
+#   }
+# 
+#   # parallel::stopCluster(cl2)
+#   stats[which.min(stats$rmse), ]
+# }
+# 
+# dat_select <- dat_select[complete.cases(dat_select), ]
+# 
+# saveRDS(dat_select, file = "data/results/ndvimax_rmse_7by7_terra.rds")
 dat_select <- readRDS("data/results/ndvimax_rmse_7by7_terra.rds")
 
 ## extract habitat information
@@ -217,7 +227,7 @@ dat_select %>%
 
 ### evaluate approach at selected training plots -----
 
-## loop over selected training plots
+# ## loop over selected training plots
 # dat_training <- foreach(h = unique(dat_sel$habitat),
 #                         .packages = lib, .combine = "rbind") %dopar% {
 # 
@@ -336,10 +346,11 @@ dat_select %>%
 # 
 #     stats_tst <- Rsenal::regressionStats(pred, resp, adj.rsq = FALSE)
 # 
-#     data.frame(NDVImax = ndvimax, TrainRMSE = Rmse_train, TrainRMSEse = Rmse_se_train,
-#                TrainBias = Bias_train, TrainRsq = Rsq_train,
-#                RMSE = stats_tst$RMSE, RMSEse = stats_tst$RMSE.se,
-#                Bias = pbias(pred, resp), Rsq = stats_tst$Rsq)
+#     data.frame(n = n, NDVImax = ndvimax, TrainRMSE = Rmse_train, 
+#                TrainRMSEse = Rmse_se_train, TrainBias = Bias_train, 
+#                TrainRsq = Rsq_train, RMSE = stats_tst$RMSE, 
+#                RMSEse = stats_tst$RMSE.se, Bias = pbias(pred, resp), 
+#                Rsq = stats_tst$Rsq)
 #   }))
 # 
 #   data.frame(habitat = h, t(data.frame(res)))
