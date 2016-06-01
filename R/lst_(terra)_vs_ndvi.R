@@ -32,59 +32,65 @@ dts_lst <- MODIS::extractDate(fls_lst)$inputLayerDates
 
 ### ndvi -----
 
-## import files
-fls_ndvi <- list.files("data/MCD09Q1.006/ndvi", 
-                       pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
-
-fls_ndvi <- fls_ndvi[grep("2011001", fls_ndvi)[1]:grep("2016121", fls_ndvi)]
-
-rst_ndvi <- stack(fls_ndvi)
-dts_ndvi <- MODIS::extractDate(fls_ndvi)$inputLayerDates
-
-## remove unavailable lst files
-fls_ndvi <- fls_ndvi[-which(!dts_ndvi %in% dts_lst)]
-rst_ndvi <- rst_ndvi[[-which(!dts_ndvi %in% dts_lst)]]
-mat_ndvi <- as.matrix(rst_ndvi)
-
-## scale incompletely covered pixels to 1
-lst_areas <- readRDS("data/weighted_area.rds")
-
-lst_areas <- lapply(lst_areas, function(i) {
-  if (round(sum(i$area), 2) != 1) {
-    i$area <- i$area * (1 / sum(i$area))
-  }
-  
-  return(i)
-})
-
-## resample ndvi
-dir_res <- "data/MCD09Q1.006/ndvi/res"
-if (!dir.exists(dir_res)) dir.create(dir_res)
-fls_res <- paste(dir_res, basename(fls_ndvi), sep = "/")
-
-lst_ndvi_res <- foreach(i = 1:nlayers(rst_ndvi), .packages = "raster") %dopar% {
-  val <- sapply(1:ncell(rst_tmp), function(j) {
-    tmp_val <- mat_ndvi[lst_areas[[j]]$cell, i]
-    
-    if (all(!is.na(tmp_val))) {
-      sum(mat_ndvi[lst_areas[[j]]$cell, i] * lst_areas[[j]]$area)
-    } else if (sum(is.na(tmp_val)) <= 0.25 * length(tmp_val)) {
-      tmp_areas <- lst_areas[[j]][!is.na(tmp_val), ]
-      tmp_areas$area <- tmp_areas$area * (1 / sum(tmp_areas$area))
-      
-      tmp_val <- tmp_val[!is.na(tmp_val)]
-      sum(mat_ndvi[tmp_areas$cell, i] * tmp_areas$area)
-    } else {
-      return(NA)
-    }
-  })
-  
-  writeRaster(setValues(rst_tmp, val), fls_res[i], 
-              format = "GTiff", overwrite = TRUE)
-}
+# ## import files
+# fls_ndvi <- list.files("data/MCD09Q1.006/ndvi", 
+#                        pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
+# 
+# fls_ndvi <- fls_ndvi[grep("2011001", fls_ndvi)[1]:grep("2016121", fls_ndvi)]
+# 
+# rst_ndvi <- stack(fls_ndvi)
+# dts_ndvi <- MODIS::extractDate(fls_ndvi)$inputLayerDates
+# 
+# ## remove unavailable lst files
+# fls_ndvi <- fls_ndvi[-which(!dts_ndvi %in% dts_lst)]
+# rst_ndvi <- rst_ndvi[[-which(!dts_ndvi %in% dts_lst)]]
+# mat_ndvi <- as.matrix(rst_ndvi)
+# 
+# ## scale incompletely covered pixels to 1
+# lst_areas <- readRDS("data/weighted_area.rds")
+# 
+# lst_areas <- lapply(lst_areas, function(i) {
+#   if (round(sum(i$area), 2) != 1) {
+#     i$area <- i$area * (1 / sum(i$area))
+#   }
+#   
+#   return(i)
+# })
+# 
+# ## resample ndvi
+# dir_res <- "data/MCD09Q1.006/ndvi/res"
+# if (!dir.exists(dir_res)) dir.create(dir_res)
+# fls_res <- paste(dir_res, basename(fls_ndvi), sep = "/")
+# 
+# lst_ndvi_res <- foreach(i = 1:nlayers(rst_ndvi), .packages = "raster") %dopar% {
+#   val <- sapply(1:ncell(rst_tmp), function(j) {
+#     tmp_val <- mat_ndvi[lst_areas[[j]]$cell, i]
+#     
+#     if (all(!is.na(tmp_val))) {
+#       sum(mat_ndvi[lst_areas[[j]]$cell, i] * lst_areas[[j]]$area)
+#     } else if (sum(is.na(tmp_val)) <= 0.25 * length(tmp_val)) {
+#       tmp_areas <- lst_areas[[j]][!is.na(tmp_val), ]
+#       tmp_areas$area <- tmp_areas$area * (1 / sum(tmp_areas$area))
+#       
+#       tmp_val <- tmp_val[!is.na(tmp_val)]
+#       sum(mat_ndvi[tmp_areas$cell, i] * tmp_areas$area)
+#     } else {
+#       return(NA)
+#     }
+#   })
+#   
+#   writeRaster(setValues(rst_tmp, val), fls_res[i], 
+#               format = "GTiff", overwrite = TRUE)
+# }
 
 # rst_ndvi_res <- resample(rst_ndvi, rst_lst)
-rst_ndvi_res <- stack(lst_ndvi_res)
+# rst_ndvi_res <- stack(lst_ndvi_res)
+
+## import resampled files
+fls_ndvi_res <- list.files("data/MCD09Q1.006/ndvi/res",
+                           pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
+
+rst_ndvi_res <- stack(fls_ndvi_res)
 mat_ndvi_res <- as.matrix(rst_ndvi_res)
 
 
