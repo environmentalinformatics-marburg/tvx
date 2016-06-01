@@ -109,10 +109,15 @@ mat_cor <- foreach(k = 1:nrow(mat_lst), .combine = "rbind") %do% {
 }
 
 # write r values to raster
-rst_r <- trim(projectRaster(setValues(rst_lst[[1]], mat_cor[, 2]), 
-                            crs = "+init=epsg:4326"))
-rst_p <- trim(projectRaster(setValues(rst_lst[[1]], mat_cor[, 3]), 
-                            crs = "+init=epsg:4326"))
+rst_r <- writeRaster(setValues(rst_lst[[1]], mat_cor[, 2]), 
+                     filename = "data/results/ndvi_lst_r.tif", 
+                     format = "GTiff", overwrite = TRUE)
+rst_r <- trim(projectRaster(rst_r, crs = "+init=epsg:4326"))
+
+rst_p <- writeRaster(setValues(rst_lst[[1]], mat_cor[, 3]), 
+                     filename = "data/results/ndvi_lst_p.tif", 
+                     format = "GTiff", overwrite = TRUE)
+rst_p <- trim(projectRaster(rst_p, crs = "+init=epsg:4326"))
 
 rst_ndvi_mu <- trim(projectRaster(calc(rst_ndvi_res, fun = function(x) {
   mean(x, na.rm = TRUE)
