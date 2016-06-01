@@ -33,7 +33,7 @@ dts_lst <- MODIS::extractDate(fls_lst)$inputLayerDates
 ### ndvi -----
 
 # ## import files
-# fls_ndvi <- list.files("data/MCD09Q1.006/ndvi", 
+# fls_ndvi <- list.files("data/MCD09Q1.006/ndvi",
 #                        pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
 # 
 # fls_ndvi <- fls_ndvi[grep("2011001", fls_ndvi)[1]:grep("2016121", fls_ndvi)]
@@ -53,7 +53,7 @@ dts_lst <- MODIS::extractDate(fls_lst)$inputLayerDates
 #   if (round(sum(i$area), 2) != 1) {
 #     i$area <- i$area * (1 / sum(i$area))
 #   }
-#   
+# 
 #   return(i)
 # })
 # 
@@ -63,26 +63,28 @@ dts_lst <- MODIS::extractDate(fls_lst)$inputLayerDates
 # fls_res <- paste(dir_res, basename(fls_ndvi), sep = "/")
 # 
 # lst_ndvi_res <- foreach(i = 1:nlayers(rst_ndvi), .packages = "raster") %dopar% {
-#   val <- sapply(1:ncell(rst_tmp), function(j) {
+#   val <- sapply(1:ncell(rst_lst[[1]]), function(j) {
 #     tmp_val <- mat_ndvi[lst_areas[[j]]$cell, i]
-#     
+# 
 #     if (all(!is.na(tmp_val))) {
 #       sum(mat_ndvi[lst_areas[[j]]$cell, i] * lst_areas[[j]]$area)
-#     } else if (sum(is.na(tmp_val)) <= 0.25 * length(tmp_val)) {
-#       tmp_areas <- lst_areas[[j]][!is.na(tmp_val), ]
-#       tmp_areas$area <- tmp_areas$area * (1 / sum(tmp_areas$area))
-#       
-#       tmp_val <- tmp_val[!is.na(tmp_val)]
-#       sum(mat_ndvi[tmp_areas$cell, i] * tmp_areas$area)
 #     } else {
-#       return(NA)
+#       if (any(!is.na(tmp_val))) {
+#         tmp_areas <- lst_areas[[j]][!is.na(tmp_val), ]
+#         tmp_areas$area <- tmp_areas$area * (1 / sum(tmp_areas$area))
+#         
+#         tmp_val <- tmp_val[!is.na(tmp_val)]
+#         sum(mat_ndvi[tmp_areas$cell, i] * tmp_areas$area)
+#       } else {
+#         return(NA)
+#       }
 #     }
 #   })
-#   
-#   writeRaster(setValues(rst_tmp, val), fls_res[i], 
+# 
+#   writeRaster(setValues(rst_lst[[1]], val), fls_res[i],
 #               format = "GTiff", overwrite = TRUE)
 # }
-
+# 
 # rst_ndvi_res <- resample(rst_ndvi, rst_lst)
 # rst_ndvi_res <- stack(lst_ndvi_res)
 
@@ -254,8 +256,8 @@ dat_plots$habitat[dat_plots$plotID == "mwh0"] <- "fpd"
 # 
 # dat_select <- dat_select[complete.cases(dat_select), ]
 # 
-# saveRDS(dat_select, file = "data/results/ndvimax_rmse_7by7_terra.rds")
-dat_select <- readRDS("data/results/ndvimax_rmse_7by7_terra.rds")
+# saveRDS(dat_select, file = "data/results/ndvimax_rmse_7by7_area_terra.rds")
+dat_select <- readRDS("data/results/ndvimax_rmse_7by7_area_terra.rds")
 
 ## extract habitat information
 dat_select$habitat <- substr(dat_select$PlotID, 1, 3)
@@ -391,31 +393,29 @@ dat_select %>%
 # 
 #     stats_tst <- Rsenal::regressionStats(pred, resp, adj.rsq = FALSE)
 # 
-#     data.frame(n = n, NDVImax = ndvimax, TrainRMSE = Rmse_train, 
-#                TrainRMSEse = Rmse_se_train, TrainBias = Bias_train, 
-#                TrainRsq = Rsq_train, RMSE = stats_tst$RMSE, 
-#                RMSEse = stats_tst$RMSE.se, Bias = pbias(pred, resp), 
+#     data.frame(n = n, NDVImax = ndvimax, TrainRMSE = Rmse_train,
+#                TrainRMSEse = Rmse_se_train, TrainBias = Bias_train,
+#                TrainRsq = Rsq_train, RMSE = stats_tst$RMSE,
+#                RMSEse = stats_tst$RMSE.se, Bias = pbias(pred, resp),
 #                Rsq = stats_tst$Rsq)
 #   }))
 # 
 #   data.frame(habitat = h, t(data.frame(res)))
 # }
 # 
-# saveRDS(dat_training, "data/results/stats_intra_7by7_terra.rds")
-dat_training <- readRDS("data/results/stats_intra_7by7_terra.rds")
+# saveRDS(dat_training, "data/results/stats_intra_7by7_area_terra.rds")
+dat_training <- readRDS("data/results/stats_intra_7by7_area_terra.rds")
 
 ## reorder factor levels
 dat_training$habitat <- factor(dat_training$habitat, 
-                               levels = c("mai", "sav", "cof", "hom", "gra", 
-                                          "flm", "fod", "foc", "fpo", "fpd", 
-                                          "fer", "fed", "hel"))
+                               levels = rev(sortElevation(FALSE)))
 
 
 ### evaluate approach at habitat scale -----
 
-## select remaining plots
-dat_test <- dat_select[!dat_select$PlotID %in% dat_sel$PlotID, ]
-
+# ## select remaining plots
+# dat_test <- dat_select[!dat_select$PlotID %in% dat_sel$PlotID, ]
+# 
 # prediction_stats <- foreach(i = as.character(dat_training$habitat),
 #                             .combine = "rbind", .packages = lib) %dopar% {
 # 
@@ -498,14 +498,12 @@ dat_test <- dat_select[!dat_select$PlotID %in% dat_sel$PlotID, ]
 #              bias = pbias(ta_prd, ta_obs), n = n)
 # }
 # 
-# saveRDS(prediction_stats, "data/results/stats_inter_7by7_terra.rds")
+# saveRDS(prediction_stats, "data/results/stats_inter_7by7_area_terra.rds")
 prediction_stats <- readRDS("data/results/stats_inter_7by7_terra.rds")
 
 ## reorder factor levels
 prediction_stats$habitat <- factor(prediction_stats$habitat, 
-                                   levels = c("mai", "sav", "cof", "hom", "gra", 
-                                              "flm", "fod", "foc", "fpo", "fpd", 
-                                              "fer", "fed", "hel"))
+                                   levels = rev(sortElevation(FALSE)))
 
 
 ### evaluate approach at plot scale -----

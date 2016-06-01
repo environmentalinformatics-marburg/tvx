@@ -29,21 +29,29 @@ dts_lst <- MODIS::extractDate(fls_lst)$inputLayerDates
 
 ### ndvi -----
 
-## import files
-fls_ndvi <- list.files("data/MCD09Q1.006/ndvi", 
-                       pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
+# ## import files
+# fls_ndvi <- list.files("data/MCD09Q1.006/ndvi", 
+#                        pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
+# 
+# fls_ndvi <- fls_ndvi[grep("2011001", fls_ndvi)[1]:grep("2016121", fls_ndvi)]
+# 
+# rst_ndvi <- stack(fls_ndvi)
+# dts_ndvi <- MODIS::extractDate(fls_ndvi)$inputLayerDates
+# 
+# ## remove unavailable lst files
+# rst_ndvi <- rst_ndvi[[-which(!dts_ndvi %in% dts_lst)]]
+# 
+# ## resample ndvi
+# rst_ndvi_res <- resample(rst_ndvi, rst_lst)
+# mat_ndvi_res <- raster::as.matrix(rst_ndvi_res)
 
-fls_ndvi <- fls_ndvi[grep("2011001", fls_ndvi)[1]:grep("2016121", fls_ndvi)]
+## import resampled files
+fls_ndvi_res <- list.files("data/MCD09Q1.006/ndvi/res",
+                           pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
 
-rst_ndvi <- stack(fls_ndvi)
-dts_ndvi <- MODIS::extractDate(fls_ndvi)$inputLayerDates
+rst_ndvi_res <- stack(fls_ndvi_res)
+mat_ndvi_res <- as.matrix(rst_ndvi_res)
 
-## remove unavailable lst files
-rst_ndvi <- rst_ndvi[[-which(!dts_ndvi %in% dts_lst)]]
-
-## resample ndvi
-rst_ndvi_res <- resample(rst_ndvi, rst_lst)
-mat_ndvi_res <- raster::as.matrix(rst_ndvi_res)
 
 
 ### study area -----
@@ -60,7 +68,7 @@ shp_plots <- readOGR("data/station_data", p4s = "+init=epsg:21037",
 
 shp_plots <- subset(shp_plots, PoleType == "AMP")
 
-dat_select <- readRDS("data/results/ndvimax_rmse_7by7_terra.rds")
+dat_select <- readRDS("data/results/ndvimax_rmse_7by7_area_terra.rds")
 
 dat_select$habitat <- substr(dat_select$PlotID, 1, 3)
 dat_select$habitat[dat_select$PlotID == "mch0"] <- "fpo"
@@ -167,6 +175,7 @@ p_kili <- spplot(rst_robust, col.regions = "transparent",
 clr_pts <- viridisLite::plasma(13)
 names(clr_pts) <- sortElevation(df = FALSE)
 
+shp_plots$habitat <- substr(shp_plots$PlotID, 1, 3)
 shp_plots$habitat <- factor(shp_plots$habitat, levels = sortElevation(FALSE))
 p_pts <- spplot(shp_plots, "habitat", col.regions = clr_pts, pch = 21) + 
   latticeExtra::layer(sp.points(shp_plots, pch = 21, cex = 1.1, col = "black"))

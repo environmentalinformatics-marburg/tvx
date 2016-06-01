@@ -7,11 +7,14 @@ rm(list = ls(all = TRUE))
 lib <- c("latticeExtra", "reshape2", "grid")
 Orcs::loadPkgs(lib)
 
+## load functions
+source("R/funs.R")
+
 
 ### plot prediction -----
 
 ## import data
-dat_training <- readRDS("data/results/stats_intra_7by7_terra.rds")
+dat_training <- readRDS("data/results/stats_intra_7by7_area_terra.rds")
 
 ## reorder factor levels
 dat_training$habitat <- factor(dat_training$habitat, 
@@ -23,7 +26,7 @@ prm1 <- c("habitat", "TrainRsq", "TrainRMSE", "TrainRMSEse",
 training_stats_mlt <- melt(dat_training[, prm1])
 
 ## strip levels
-lvl1 <- c(expression("a)" ~ bold("R-squared")), expression("b)" ~ bold("RMSE")))
+lvl1 <- c(expression("a)" ~ bold("R-squared")), expression("b)" ~ bold("RMSE (" * degree * "C)")))
 
 ## colors
 clr <- RColorBrewer::brewer.pal(3, "PuOr")
@@ -66,7 +69,7 @@ p1 <- dotplot(habitat ~ value | variable, xlim = list(xlim_rsq, xlim_rmse),
 ### habitat prediction -----
 
 ## import data
-prediction_stats <- readRDS("data/results/stats_inter_7by7_terra.rds")
+prediction_stats <- readRDS("data/results/stats_inter_7by7_area_terra.rds")
 
 ## reorder factor levels
 prediction_stats$habitat <- factor(prediction_stats$habitat, 
@@ -77,7 +80,7 @@ prm2 <- c("habitat", "rsq", "rmse", "rmse.se")
 prediction_stats_mlt <- melt(prediction_stats[, prm2])
 
 ## strip levels
-lvl2 <- c(expression("c)" ~ bold("R-squared")), expression("d)" ~ bold("RMSE")))
+lvl2 <- c(expression("c)" ~ bold("R-squared")), expression("d)" ~ bold("RMSE (" * degree * "C)")))
 
 ## create plot
 p2 <- dotplot(habitat ~ value | variable, xlim = list(xlim_rsq, xlim_rmse), 
@@ -124,8 +127,12 @@ vp0 <- viewport(x = .05, y = 1, width = .95, height = .5, just = c("left", "top"
 pushViewport(vp0)
 print(p1, newpage = FALSE)
 
+downViewport(trellis.vpname("figure"))
+grid.lines(c(.9, .999), c(.8815, .8815), gp = gpar(fill = "black"),
+           arrow = arrow(length = unit(.225, "cm"), type = "closed"))
+
 ## add test stats
-upViewport()
+upViewport(0)
 vp1 <- viewport(x = .05, y = .636, width = .95, height = .5, just = c("left", "top"))
 pushViewport(vp1)
 print(p2, newpage = FALSE)
