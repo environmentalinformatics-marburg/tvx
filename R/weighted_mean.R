@@ -1,12 +1,18 @@
+library(raster)
+library(doParallel)
 library(rgeos)
 
+## parallelization
+cl <- makeCluster(detectCores() - 1)
+registerDoParallel()
+
 ## polygons: ndvi
-rst_tmp <- rst_ndvi[[1]]
+rst_tmp <- raster("data/MCD09Q1.A2011001.sur_refl.tif")
 rst_tmp[is.na(rst_tmp[])] <- 0
 spy_ndvi <- rasterToPolygons(rst_tmp)
 
 ## polygons: lst
-rst_tmp <- rst_lst[[1]]
+rst_tmp <- raster("data/MOD11A2.A2011001.LST_Day_1km.tif")
 rst_tmp[is.na(rst_tmp[])] <- 0
 spy_lst <- rasterToPolygons(rst_tmp)
 
@@ -24,3 +30,5 @@ lst_areas <- foreach(i = 1:length(spy_lst),
   
   data.frame(cell = which(cutset), area = spy_ndvi_areas)
 }
+
+saveRDS(lst_areas, "data/weighted_area.rds")
