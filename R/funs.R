@@ -11,6 +11,7 @@ movingWindow <- function(width = 7L, height = width) {
 sortElevation <- function(df = TRUE) {
   
   ## load required packages
+  library(rgdal)
   library(dplyr)
   
   ## import plot data
