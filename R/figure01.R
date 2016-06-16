@@ -49,6 +49,9 @@ dts_lst <- MODIS::extractDate(fls_lst)$inputLayerDates
 fls_ndvi_res <- list.files("data/MCD09Q1.006/ndvi/res",
                            pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
 
+fls_ndvi_res <- fls_ndvi_res[grep("2011001", fls_ndvi_res)[1]:
+                               grep("2016121", fls_ndvi_res)]
+
 rst_ndvi_res <- stack(fls_ndvi_res)
 mat_ndvi_res <- as.matrix(rst_ndvi_res)
 
@@ -172,7 +175,7 @@ p_kili <- spplot(rst_robust, col.regions = "transparent",
                  scales = list(draw = TRUE, cex = .6, 
                                y = list(rot = 90)), colorkey = FALSE, 
                  sp.layout = list(rgb2spLayout(rst_kili, c(.01, .998)), 
-                                  scale, text1, text2, 
+                                  scale, text1, text2, arrow,
                                   list("sp.text", loc = c(37.02, -2.86), 
                                        txt = "a)", font = 2, cex = .6, 
                                        adj = c(.1, 1), col = "black")))
