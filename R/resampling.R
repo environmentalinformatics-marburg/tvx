@@ -40,7 +40,6 @@ dts_ndvi250 <- extractDate(fls_ndvi250)$inputLayerDates
 
 id <- which(!(dts_ndvi250 %in% dts_lst))
 rst_ndvi250 <- rst_ndvi250[[-id]]; dts_ndvi250 <- dts_ndvi250[-id]
-mat_ndvi250 <- as.matrix(rst_ndvi250)
 
 ## dem
 rst_dem <- raster("data/DEM/DEM_ARC1960_30m_Hemp.tif")
@@ -69,28 +68,12 @@ dat_cfs <- foreach(j = 1:ncol(mat_lst), .combine = "rbind") %do% {
              intercept = int, slope1 = slp1, slope2 = slp2, rsq = rsq, p = p)
 }
 
-## identify 250-m cells within each 1-km cell
-# dat_cls <- data.frame(matrix(nrow = ncell(rst_ndvi), ncol = 16))
-# 
-# for (i in 1:ncell(rst_ndvi)) {
-#   if (i %% 100 == 0)
-#     cat("Now processing cell no.", i, "...\n")
-#   
-#   rst <- rst_ndvi[[1]]
-#   rst[i] <- 1; rst[][-i] <- NA
-#   shp <- rasterToPolygons(rst)
-#   cls <- unlist(cellFromPolygon(rst_ndvi250, shp))
-#   dat_cls[i, ] <- cls
-# }
-# 
-# saveRDS(dat_cls, "data/cells250m.rds")
-dat_cls <- readRDS("data/cells250m.rds")
-
 ## perform resampling
 dir_lst250 <- "data/MOD11Q1.006"
 if (!dir.exists(dir_lst250)) dir.create(dir_lst250)
 
 fls_lst250 <- paste0(dir_lst250, "/", basename(fls_lst))
+fls_lst250 <- gsub("MOD11A2", "MOD11Q1", fls_lst250)
 
 lst_lst250 <- foreach(i = 1:nlayers(rst_lst), .packages = "raster") %dopar% {
   if (file.exists(fls_lst250[i])) {

@@ -20,108 +20,52 @@ registerDoParallel(cl)
 ### lst -----
 
 ## import files (daytime)
-fls_lst <- list.files("data/MOD11A2.005/qc", 
-                      pattern = "^MOD11A2.*_Day_1km.tif$", full.names = TRUE)
-
-fls_lst <- fls_lst[grep("2011001", fls_lst)[1]:grep("2016121", fls_lst)]
-
-rst_lst <- stack(fls_lst) - 273.15
+fls_lst <- list.files("data/MOD11Q1.006", 
+                      pattern = "Day_1km.tif$", full.names = TRUE)
+rst_lst <- stack(fls_lst)
 mat_lst <- as.matrix(rst_lst)
 dts_lst <- MODIS::extractDate(fls_lst)$inputLayerDates
 
 
 ### ndvi -----
 
-# ## import files
-# fls_ndvi <- list.files("data/MCD09Q1.006/ndvi",
-#                        pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
-# 
-# fls_ndvi <- fls_ndvi[grep("2011001", fls_ndvi)[1]:grep("2016121", fls_ndvi)]
-# 
-# rst_ndvi <- stack(fls_ndvi)
-# dts_ndvi <- MODIS::extractDate(fls_ndvi)$inputLayerDates
-# 
-# ## remove unavailable lst files
-# fls_ndvi <- fls_ndvi[-which(!dts_ndvi %in% dts_lst)]
-# rst_ndvi <- rst_ndvi[[-which(!dts_ndvi %in% dts_lst)]]
-# mat_ndvi <- as.matrix(rst_ndvi)
-# 
-# ## scale incompletely covered pixels to 1
-# lst_areas <- readRDS("data/weighted_area.rds")
-# 
-# lst_areas <- lapply(lst_areas, function(i) {
-#   if (round(sum(i$area), 2) != 1) {
-#     i$area <- i$area * (1 / sum(i$area))
-#   }
-# 
-#   return(i)
-# })
-# 
-# ## resample ndvi
-# dir_res <- "data/MCD09Q1.006/ndvi/res"
-# if (!dir.exists(dir_res)) dir.create(dir_res)
-# fls_res <- paste(dir_res, basename(fls_ndvi), sep = "/")
-# 
-# lst_ndvi_res <- foreach(i = 1:nlayers(rst_ndvi), .packages = "raster") %dopar% {
-#   val <- sapply(1:ncell(rst_lst[[1]]), function(j) {
-#     tmp_val <- mat_ndvi[lst_areas[[j]]$cell, i]
-# 
-#     if (all(!is.na(tmp_val))) {
-#       sum(mat_ndvi[lst_areas[[j]]$cell, i] * lst_areas[[j]]$area)
-#     } else {
-#       if (any(!is.na(tmp_val))) {
-#         tmp_areas <- lst_areas[[j]][!is.na(tmp_val), ]
-#         tmp_areas$area <- tmp_areas$area * (1 / sum(tmp_areas$area))
-#         
-#         tmp_val <- tmp_val[!is.na(tmp_val)]
-#         sum(mat_ndvi[tmp_areas$cell, i] * tmp_areas$area)
-#       } else {
-#         return(NA)
-#       }
-#     }
-#   })
-# 
-#   writeRaster(setValues(rst_lst[[1]], val), fls_res[i],
-#               format = "GTiff", overwrite = TRUE)
-# }
-# 
-# rst_ndvi_res <- resample(rst_ndvi, rst_lst)
-# rst_ndvi_res <- stack(lst_ndvi_res)
+## list available files
+fls_ndvi <- list.files("data/MCD13Q1.006/whittaker",
+                       pattern = "NDVI.tif$", full.names = TRUE)
+dts_ndvi <- MODIS::extractDate(fls_ndvi)$inputLayerDates
 
-## import resampled files
-fls_ndvi_res <- list.files("data/MCD09Q1.006/ndvi/res",
-                           pattern = "^MCD09Q1.*.tif$", full.names = TRUE)
-
-rst_ndvi_res <- stack(fls_ndvi_res)
-mat_ndvi_res <- as.matrix(rst_ndvi_res)
+## remove unavailable lst files
+fls_ndvi <- fls_ndvi[-which(!dts_ndvi %in% dts_lst)]
+rst_ndvi <- stack(fls_ndvi)
+mat_ndvi <- as.matrix(rst_ndvi)
 
 
 ### temperature-vegetation index (tvx) related slope, intercept, and
 ### regression coefficient -----
 
 ## target folder
-dir_tvx <- "data/MOD11A2.005/tvx_7by7_area"
+dir_tvx <- "data/MOD11Q1.006/tvx_7by7"
 if (!dir.exists(dir_tvx)) dir.create(dir_tvx)
 
 ## loop over layers
+fls_tvx <- paste0(dir_tvx, "/", basename(fls_lst))
+fls_tvx <- gsub("LST", "TVX", fls_tvx)
+
 lst_tvx <- foreach(i = 1:nlayers(rst_lst), .packages = "raster") %dopar% {
   
-  # target file
-  fls_tvx <- paste0(dir_tvx, "/", gsub("LST", "TVX", names(rst_lst)[i]), ".tif")
-  
   # import file if available
-  if (file.exists(fls_tvx)) {
-    stack(fls_tvx)
+  if (file.exists(fls_tvx[i])) {
+    stack(fls_tvx[i])
     
     # else fit moving window model  
   } else {
     
-    mod <- movingModel(rst_lst[[i]], rst_ndvi_res[[i]], 
+    mod <- movingModel(rst_lst[[i]], rst_ndvi[[i]], 
                        directions = movingWindow(7L))
     mod <- stack(mod)
     
     # save metrics
-    writeRaster(mod, filename = fls_tvx, format = "GTiff", overwrite = TRUE)
+    writeRaster(mod, filename = fls_tvx[i], format = "GTiff", overwrite = TRUE)
   }
 }
 
