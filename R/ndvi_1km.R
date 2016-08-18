@@ -21,13 +21,13 @@ MODISoptions(localArcPath = "/media/dogbert/modis_data/MODIS_ARC",
 
 ## download .hdf files in parallel
 foreach(product = c("MOD13A2", "MYD13A2"), .packages = "MODIS") %dopar% {
-  getHdf(product, tileH = 21, tileV = 9, begin = "2011001",
+  getHdf(product, tileH = 21, tileV = 9, 
          collection = getCollection(product, forceCheck = TRUE))
 }
 
 ## extract required sds
 for (product in c("MOD13A2", "MYD13A2")) {
-  runGdal(product, tileH = 21, tileV = 9, begin = "2011001",
+  runGdal(product, tileH = 21, tileV = 9, 
           collection = getCollection(product, forceCheck = TRUE), 
           job = paste0(product, ".006"), SDSstring = "101000000001")
 }
@@ -63,7 +63,7 @@ lst_prd <- lapply(c("MOD13A2", "MYD13A2"), function(product) {
       if (file.exists(fls_out[j])) {
         raster::raster(fls_out[j])
       } else {
-        rst_out <- raster::crop(rst[[j]], rst_ref, snap = "out")
+        rst_out <- raster::crop(rst[[j]], rst_ref, snap = "near")
         
         # apply scale factor
         if (i == "NDVI")
@@ -171,6 +171,10 @@ rst_qc2 <- stack(lst_prd)
 rst_qc2 <- rst_qc2[[order(dts_qc2)]]
 nms_qc2 <- nms_qc2[order(dts_qc2)]
 
+## start with start date of aqua availability
+rst_qc2 <- rst_qc2[[(grep("MYD13A2", nms_qc2)[1]-1):nlayers(rst_qc2)]]
+nms_qc2 <- nms_qc2[(grep("MYD13A2", nms_qc2)[1]-1):length(nms_qc2)]
+
 detach("package:MODIS", unload = TRUE)
 install.packages("inst/extdata/MODIS_0.10-18.tar.gz",
                  repos = NULL, type = "source")
@@ -199,6 +203,10 @@ rst_wht <- stack(lst_wht)
 fls_old <- list.files(dir_wht, pattern = "NDVI_YearlyLambda", 
                       full.names = TRUE)
 file.remove(fls_old)
+
+## re-install new modis version
+detach("package:MODIS", unload = TRUE)
+devtools::install_github("MatMatt/MODIS", ref = "develop")
 
 ## deregister parallel backend
 stopCluster(cl)
