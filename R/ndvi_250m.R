@@ -168,6 +168,16 @@ nms_qc2 <- nms_qc2[order(dts_qc2)]
 rst_qc2 <- rst_qc2[[(grep("MYD13Q1", nms_qc2)[1]-1):nlayers(rst_qc2)]]
 nms_qc2 <- nms_qc2[(grep("MYD13Q1", nms_qc2)[1]-1):length(nms_qc2)]
 
+## write raw images to disc
+fls_qc2 <- paste0(dir_prd, "/", nms_qc2, ".tif")
+fls_qc2 <- gsub("MOD13Q1", "MCD13Q1", fls_qc2)
+fls_qc2 <- gsub("MYD13Q1", "MCD13Q1", fls_qc2)
+
+lst_qc2 <- foreach(i = 1:nlayers(rst_qc2), .packages = "raster") %dopar% 
+  writeRaster(rst_qc2[[i]], filename = fls_qc2[i], format = "GTiff", 
+              overwrite = TRUE)
+
+## install old 'MODIS' version
 detach("package:MODIS", unload = TRUE)
 install.packages("/media/dogbert/dev/data/MODIS_0.10-18.tar.gz",
                  repos = NULL, type = "source")
@@ -177,7 +187,7 @@ library(MODIS)
 lst_wht <- whittaker.raster(rst_qc2, outDirPath = dir_wht,
                             overwrite = TRUE, format = "GTiff")
 
-## write to disc
+## write whittaker-smoothed images to disc
 rst_wht <- stack(lst_wht)
 names(rst_wht) <- gsub("MOD13A2", "MCD13A2", nms_qc2)
 names(rst_wht) <- gsub("MYD13A2", "MCD13A2", names(rst_wht))
