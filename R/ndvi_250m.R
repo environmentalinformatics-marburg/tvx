@@ -22,7 +22,7 @@ MODISoptions(localArcPath = "/media/dogbert/dev/data/MODIS_ARC/",
 # 
 # ## download .hdf files in parallel
 # foreach(product = c("MOD13Q1", "MYD13Q1"), .packages = "MODIS") %dopar% {
-#   getHdf(product, tileH = 21, tileV = 9, 
+#   getHdf(product, tileH = 21, tileV = 9,
 #          collection = getCollection(product, forceCheck = TRUE))
 # }
 # 
@@ -37,6 +37,17 @@ MODISoptions(localArcPath = "/media/dogbert/dev/data/MODIS_ARC/",
 
 ## reference grid
 rst_ref <- raster("data/reference_grid.tif")
+
+library(GSODTools)
+kia <- subset(gsodstations, STATION.NAME == "KILIMANJARO INTL")
+coordinates(kia) <- ~ LON + LAT; proj4string(kia) <- "+init=epsg:4326"
+kia <- spTransform(kia, CRS = CRS(projection(rst_ref)))
+
+ext <- extent(rst_ref)
+ymin(ext) <- ymin(kia) - 5000
+ymax(ext) <- ymax(ext) + 5000
+xmin(ext) <- xmin(ext) - 5000
+xmax(ext) <- xmax(ext) + 5000
 
 ## loop over products
 lst_prd <- lapply(c("MOD13Q1", "MYD13Q1"), function(product) {
@@ -177,11 +188,11 @@ lst_qc2 <- foreach(i = 1:nlayers(rst_qc2), .packages = "raster") %dopar%
   writeRaster(rst_qc2[[i]], filename = fls_qc2[i], format = "GTiff", 
               overwrite = TRUE)
 
-## install old 'MODIS' version
-detach("package:MODIS", unload = TRUE)
-install.packages("/media/dogbert/dev/data/MODIS_0.10-18.tar.gz",
-                 repos = NULL, type = "source")
-library(MODIS)
+# ## install old 'MODIS' version
+# detach("package:MODIS", unload = TRUE)
+# install.packages("/media/dogbert/dev/data/MODIS_0.10-18.tar.gz",
+#                  repos = NULL, type = "source")
+# library(MODIS)
 
 ## apply whittaker smoother
 lst_wht <- whittaker.raster(rst_qc2, outDirPath = dir_wht,
@@ -189,8 +200,8 @@ lst_wht <- whittaker.raster(rst_qc2, outDirPath = dir_wht,
 
 ## write whittaker-smoothed images to disc
 rst_wht <- stack(lst_wht)
-names(rst_wht) <- gsub("MOD13A2", "MCD13A2", nms_qc2)
-names(rst_wht) <- gsub("MYD13A2", "MCD13A2", names(rst_wht))
+names(rst_wht) <- gsub("MOD13Q1", "MCD13Q1", nms_qc2)
+names(rst_wht) <- gsub("MYD13Q1", "MCD13Q1", names(rst_wht))
 fls_wht <- paste0(dir_wht, "/", names(rst_wht), ".tif")
 
 lst_wht <- foreach(i = 1:nlayers(rst_wht), .packages = "raster") %dopar% {
@@ -203,8 +214,7 @@ lst_wht <- foreach(i = 1:nlayers(rst_wht), .packages = "raster") %dopar% {
 rst_wht <- stack(lst_wht)
 
 ## remove deprecated whittaker-related files
-fls_old <- list.files(dir_wht, pattern = "NDVI_YearlyLambda", 
-                      full.names = TRUE)
+fls_old <- list.files(dir_wht, pattern = "yL5000.ndvi.tif", full.names = TRUE)
 file.remove(fls_old)
 
 ## deregister parallel backend
