@@ -3,9 +3,11 @@
 ## clear workspace
 rm(list = ls(all = TRUE))
 
-## load packages
+## load packages and functions
 lib <- c("doParallel", "MODIS", "Rsenal")
 Orcs::loadPkgs(lib)
+
+source("R/uniformExtent.R")
 
 ## parallelization
 cl <- makeCluster(detectCores() - 1)
@@ -35,19 +37,8 @@ MODISoptions(localArcPath = "/media/dogbert/dev/data/MODIS_ARC/",
 
 ### processing -----
 
-## reference grid
-rst_ref <- raster("data/reference_grid.tif")
-
-library(GSODTools)
-kia <- subset(gsodstations, STATION.NAME == "KILIMANJARO INTL")
-coordinates(kia) <- ~ LON + LAT; proj4string(kia) <- "+init=epsg:4326"
-kia <- spTransform(kia, CRS = CRS(projection(rst_ref)))
-
-ext <- extent(rst_ref)
-ymin(ext) <- ymin(kia) - 5000
-ymax(ext) <- ymax(ext) + 5000
-xmin(ext) <- xmin(ext) - 5000
-xmax(ext) <- xmax(ext) + 5000
+## reference extent
+ext <- uniformExtent()
 
 ## loop over products
 lst_prd <- lapply(c("MOD13Q1", "MYD13Q1"), function(product) {
@@ -74,7 +65,7 @@ lst_prd <- lapply(c("MOD13Q1", "MYD13Q1"), function(product) {
       if (file.exists(fls_out[j])) {
         raster::raster(fls_out[j])
       } else {
-        rst_out <- raster::crop(rst[[j]], rst_ref, snap = "out")
+        rst_out <- raster::crop(rst[[j]], ext, snap = "out")
         
         # apply scale factor
         if (i %in% c("NDVI", "EVI"))
