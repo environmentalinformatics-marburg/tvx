@@ -179,12 +179,6 @@ lst_qc2 <- foreach(i = 1:nlayers(rst_qc2), .packages = "raster") %dopar%
   writeRaster(rst_qc2[[i]], filename = fls_qc2[i], format = "GTiff", 
               overwrite = TRUE)
 
-# ## install old 'MODIS' version
-# detach("package:MODIS", unload = TRUE)
-# install.packages("/media/dogbert/dev/data/MODIS_0.10-18.tar.gz",
-#                  repos = NULL, type = "source")
-# library(MODIS)
-
 ## apply whittaker smoother
 lst_wht <- whittaker.raster(rst_qc2, outDirPath = dir_wht,
                             overwrite = TRUE, format = "GTiff")
