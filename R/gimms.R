@@ -20,8 +20,10 @@ registerDoParallel(cl)
 fls <- downloadGimms(dsn = "data/gimms3g/raw", cores = 3L)
 
 ## rasterize data and flags
+if (!dir.exists("data/gimms3g/rst")) dir.create("data/gimms3g/rst")
 fls_ndvi <- gsub("raw", "rst/ndvi", fls)
 fls_ndvi <- paste0(fls_ndvi, ".tif")
+if (!dir.exists(unique(dirname(fls_ndvi)))) dir.create(unique(dirname(fls_ndvi)))
 rst_ndvi <- if (all(file.exists(fls_ndvi))) {
   stack(fls_ndvi)
 } else {
@@ -30,6 +32,7 @@ rst_ndvi <- if (all(file.exists(fls_ndvi))) {
 
 fls_flag <- gsub("raw", "rst/flag", fls)
 fls_flag <- paste0(fls_flag, ".tif")
+if (!dir.exists(unique(dirname(fls_flag)))) dir.create(unique(dirname(fls_flag)))
 rst_flag <- if (all(file.exists(fls_flag))) {
   stack(fls_flag)
 } else {
@@ -137,7 +140,7 @@ rst_wht <- stack(lst_wht); rm(lst_wht)
 
 ## remove deprecated whittaker-related files
 fls_old <- list.files(dir_wht, pattern = "yL5000.ndvi.tif", full.names = TRUE)
-file.remove(fls_old)
+jnk <- file.remove(fls_old)
 
 
 ### monthly aggregation --------------------------------------------------------
