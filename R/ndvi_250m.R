@@ -14,25 +14,32 @@ cl <- makeCluster(detectCores() - 1)
 registerDoParallel(cl)
 
 ## 'MODIS' global settings
-MODISoptions(localArcPath = "/media/dogbert/dev/data/MODIS_ARC/", 
-             outDirPath = "/media/dogbert/dev/data/MODIS_ARC/PROCESSED/", 
-             outProj = "+init=epsg:21037", 
-             MODISserverOrder = c("LAADS", "LPDAAC"))
+lap <- switch(Sys.info()[["sysname"]], 
+              "Windows" = "D:/MODIS_ARC", 
+              "Linux" = "/media/fdetsch/XChange/MODIS_ARC")
+
+MODISoptions(localArcPath = lap, outDirPath = paste0(lap, "/PROCESSED"), 
+             MODISserverOrder = c("LAADS", "LPDAAC"), 
+             outProj = "+init=epsg:21037")
 
 
-# ### preprocessing -----
-# 
-# ## download .hdf files in parallel
-# foreach(product = c("MOD13Q1", "MYD13Q1"), .packages = "MODIS") %dopar% {
-#   getHdf(product, tileH = 21, tileV = 9,
-#          collection = getCollection(product, forceCheck = TRUE))
-# }
-# 
-# ## extract required sds
-# for (product in c("MOD13Q1", "MYD13Q1")) {
-#   runGdal(product, tileH = 21, tileV = 9, job = paste0(product, ".006"),
-#           collection = "006", SDSstring = "101000000001")
-# }
+### preprocessing -----
+
+## download .hdf files in parallel
+hdf <- foreach(product = c("MOD13Q1", "MYD13Q1"), .packages = "MODIS") %dopar% {
+  getHdf(product, tileH = 21, tileV = 9, 
+         begin = ifelse(product == "MOD13Q1", "2016241", "2016249"),
+         collection = getCollection(product, forceCheck = TRUE))
+}
+
+## extract required sds
+tif <- vector("list", 2L); n <- 1L
+for (product in c("MOD13Q1", "MYD13Q1")) {
+  tif[[n]] <- runGdal(product, tileH = 21, tileV = 9, job = paste0(product, ".006"),
+                      collection = "006", SDSstring = "101000000001", 
+                      begin = ifelse(product == "MOD13Q1", "2016241", "2016249"))
+  n <- n + 1
+}
 
 
 ### processing -----
