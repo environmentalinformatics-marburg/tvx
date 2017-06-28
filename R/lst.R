@@ -12,113 +12,68 @@ cl <- makeCluster(detectCores() - 1)
 registerDoParallel(cl)
 
 ## modis options
-MODISoptions(localArcPath = "/media/dogbert/modis_data/MODIS_ARC", 
-             outDirPath = "/media/dogbert/modis_data/MODIS_ARC/PROCESSED", 
-             outProj = "+init=epsg:21037")
+MODISoptions("/media/fdetsch/XChange/MODIS_ARC", 
+             "/media/fdetsch/XChange/MODIS_ARC/PROCESSED", 
+             outProj = "+init=epsg:32637")
 
 
 ### data download and preprocessing -----
 
-## download data
-foreach(product = c("MOD11A2", "MYD11A2"), .packages = lib) %dopar%
-  MODIS::getHdf(product, tileH = 21, tileV = 9, begin = "2011001", 
-                collection = getCollection(product, forceCheck = TRUE))
+## reference extent (bale)
+stn <- shapefile("../../data/bale/ema/ema_stations.shp")
+ext <- as(extent(stn), "SpatialPolygons"); proj4string(ext) <- proj4string(stn)
+bff <- rgeos::gBuffer(ext, width = 1e3)
+
+## reference extent (kili)
+rst_ref <- raster("data/reference_grid.tif")
 
 ## extract relevant sds
-foreach(product = c("MOD11A2", "MYD11A2")) %do%
-  MODIS::runGdal(product, tileH = 21, tileV = 9, begin = "2011001", 
-                 collection = getCollection(product, forceCheck = TRUE),
-                 SDSstring = "110011000011", job = paste0(product, ".006"))
+tfs <- runGdal("M*D11A2", extent = bff, job = "balelst",
+               collection = getCollection("MOD11A2", forceCheck = TRUE),
+               SDSstring = "111011100011")
 
 
 ### data processing -----
 
-## reference grid
-rst_ref <- raster("data/reference_grid.tif")
-
 ## loop over single product
-lst <- lapply(c("MOD11A2", "MYD11A2"), function(product) {
+lst <- foreach(product = tfs, n = 1:length(tfs)) %do% {
   
   ## status message
-  cat("Commencing with the processing of", product, "...\n")
-  
-  ### crop layers ----------------------------------------------------------------
-  
-  ## setup output folder
-  dir_out <- paste0("data/", product, ".006")
-  if (!dir.exists(dir_out)) dir.create(dir_out)
-  
-  ## perform crop
-  pattern <- c("Day_1km", "QC_Day", "Clear_sky_days", 
-               "Night_1km", "QC_Night", "Clear_sky_nights")
-  
-  rst_crp <- foreach(i = pattern, .packages = "MODIS", 
-                     .export = ls(envir = globalenv())) %dopar% {
-    
-    # list and import available files
-    fls <- list.files(paste0(getOption("MODIS_outDirPath"), "/", product, ".006"),
-                      pattern = paste0(i, ".tif$"), full.names = TRUE)
-    
-    rst <- raster::stack(fls)
-    
-    # crop
-    dir_crp <- paste0(dir_out, "/crp")
-    if (!dir.exists(dir_crp)) dir.create(dir_crp)
-    
-    fls_crp <- paste(dir_crp, basename(fls), sep = "/")
+  cat("Commencing with", names(tfs)[n], "processing...\n")
 
-    lst_crp <- lapply(1:(raster::nlayers(rst)), function(j) {
-      if (file.exists(fls_crp[j])) {
-        raster::raster(fls_crp[j])
-      } else {
-        rst_crp <- raster::crop(rst[[j]], rst_ref, snap = "near")
-        
-        # if dealing with (day or night) lst bands, convert to 16-bit unsigned
-        # integer and apply scale factor of 0.02 and offset of -273.15
-        if (i %in% c("Day_1km", "Night_1km")) {
-          raster::dataType(rst_crp) <- "INT2U"
-          rst_crp <- rst_crp * 0.02 - 273.15
-        
-        # else if dealing with (day or night) no. of clear-sky observations, 
-        # convert to 16-bit unsigned integer and apply scale factor of 0.0005
-        } else if (i %in% c("Clear_sky_days", "Clear_sky_nights")) {
-          raster::dataType(rst_crp) <- "INT2U"
-          rst_crp <- rst_crp * 0.0005
-
-        # else convert to 8-bit unsigned integer
-        } else {
-          raster::dataType(rst_crp) <- "INT1U"
-        }
-        
-        # save and return cropped layers
-        raster::writeRaster(rst_crp, filename = fls_crp[j],
-                            format = "GTiff", overwrite = TRUE)
-      }
-    })
     
-    raster::stack(lst_crp)
-  }
-  
-
   ### quality control ----------------------------------------------------------
   ### discard cloudy pixels based on companion quality information ('QC_Day', 
   ### 'QC_Night')
   
-  dir_qc <- paste0(dir_out, "/qc")
+  dir_prd <- paste0("data/", names(tfs)[n])
+  if (!dir.exists(dir_prd)) dir.create(dir_prd)
+  
+  dir_qc <- paste0(dir_prd, "/qc")
   if (!dir.exists(dir_qc)) dir.create(dir_qc)
   
   ## perform quality check for day and night separately
-  lst_qc <- foreach(i = rst_crp[c(1, 4)], j = rst_crp[c(2, 6)]) %do% {
-
-    ## loop over layers
-    fls_qc <- paste0(dir_qc, "/", names(i), ".tif")
-    lst_out <- foreach(k = 1:nlayers(i), .packages = "raster", 
-                       .export = ls(envir = globalenv())) %dopar% {
+  lst <- unlist(lapply(c(1, 4), function(i) unlist(sapply(product, "[[", i))))
+  qcs <- unlist(lapply(c(2, 5), function(i) unlist(sapply(product, "[[", i))))
+  
+  ## loop over layers
+  fls_qc <- paste0(dir_qc, "/", basename(lst))
+  
+  if (all(file.exists(fls_qc))) {
+    cat("All quality-controlled", names(tfs)[n], "files exist, skipping iteration...\n")
+    stack(fls_qc)
+  } else {
+    cat("Commencing with", names(tfs)[n], "quality control...\n")
+    stack(foreach(i = 1:length(lst), .packages = "raster", 
+                  .export = ls(envir = globalenv())) %dopar% {
       
-      if (file.exists(fls_qc[k])) {
+      if (file.exists(fls_qc[i])) {
         raster(fls_qc[k])
       } else {
-        overlay(i[[k]], j[[k]], fun = function(x, y) {
+        r1 <- raster(lst[i]); r1 <- r1 * 0.02 - 273.15
+        r2 <- raster(qcs[i])
+        
+        overlay(r1, r2, fun = function(x, y) {
           id <- sapply(y[], function(l) {
             bin <- Rsenal::number2binary(l, 8, TRUE)
             mandatory_qa <- substr(bin, 7, 8)
@@ -143,14 +98,12 @@ lst <- lapply(c("MOD11A2", "MYD11A2"), function(product) {
           
           x[!id] <- NA
           return(x)
-        }, filename = fls_qc[k], overwrite = TRUE, format = "GTiff")
+        }, filename = fls_qc[i])
       }
-    }
-
-    stack(lst_out)
+    })
   }
-})
-
+}
+  
 
 ### combined product -----
 
