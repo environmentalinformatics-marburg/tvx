@@ -4,7 +4,7 @@
 rm(list = ls(all = TRUE))
 
 ## load packages
-lib <- c("doParallel", "MODIS", "Rsenal")
+lib <- c("doParallel", "MODIS", "Rsenal", "ESD")
 Orcs::loadPkgs(lib)
 
 ## parallelization
