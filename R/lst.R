@@ -12,9 +12,8 @@ cl <- makeCluster(detectCores() - 1)
 registerDoParallel(cl)
 
 ## modis options
-MODISoptions("/media/fdetsch/XChange/MODIS_ARC", 
-             "/media/fdetsch/XChange/MODIS_ARC/PROCESSED", 
-             outProj = "+init=epsg:32637")
+lap <- "/media/fdetsch/XChange/MODIS_ARC"
+MODISoptions(lap, paste0(lap, "/PROCESSED"), quiet = TRUE)
 
 
 ### data download and preprocessing -----
@@ -22,15 +21,17 @@ MODISoptions("/media/fdetsch/XChange/MODIS_ARC",
 ## reference extent (bale)
 stn <- shapefile("../../data/bale/ema/ema_stations.shp")
 ext <- as(extent(stn), "SpatialPolygons"); proj4string(ext) <- proj4string(stn)
-bff <- rgeos::gBuffer(ext, width = 1e3)
+ema <- rgeos::gBuffer(ext, width = 1e4)
 
 ## reference extent (kili)
-rst_ref <- raster("data/reference_grid.tif")
+rst <- raster("data/reference_grid.tif"); ext <- extent(rst)
+ymin(ext) <- ymin(ext) - 1e4
+tma <- as(ext, "SpatialPolygons"); proj4string(tma) <- projection(rst)
 
 ## extract relevant sds
-tfs <- runGdal("M*D11A2", extent = bff, job = "balelst",
-               collection = getCollection("MOD11A2", forceCheck = TRUE),
-               SDSstring = "111011100011")
+tfs <- foreach(i = list(ema, tma), j = as.list(1:2)) %do%
+  runGdal("M*D11A2", extent = i, collection = "006", SDSstring = "110011000000",
+          job = paste0("lst-1km-", ifelse(j == 1, "bale", "kili")))
 
 
 ### data processing -----
@@ -53,8 +54,8 @@ lst <- foreach(product = tfs, n = 1:length(tfs)) %do% {
   if (!dir.exists(dir_qc)) dir.create(dir_qc)
   
   ## perform quality check for day and night separately
-  lst <- unlist(lapply(c(1, 4), function(i) unlist(sapply(product, "[[", i))))
-  qcs <- unlist(lapply(c(2, 5), function(i) unlist(sapply(product, "[[", i))))
+  lst <- unlist(lapply(c(1, 3), function(i) unlist(sapply(product, "[[", i))))
+  qcs <- unlist(lapply(c(2, 4), function(i) unlist(sapply(product, "[[", i))))
   
   ## loop over layers
   fls_qc <- paste0(dir_qc, "/", basename(lst))
